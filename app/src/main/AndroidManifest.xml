@@ -135,7 +135,7 @@
             <meta-data android:name="WindowManagerPreference:FreeformWindowOrientation" android:value="landscape" />
         </activity>
         <activity
-            android:name=".preferences.AddComputerManually"
+            android:name=".preferences.AddComputerManuallyActivity"
             android:exported="true"
             android:resizeableActivity="true"
             android:windowSoftInputMode="stateVisible"

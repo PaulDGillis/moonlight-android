@@ -16,7 +16,7 @@ import com.limelight.nvstream.http.NvHTTP;
 import com.limelight.nvstream.http.PairingManager;
 import com.limelight.nvstream.http.PairingManager.PairState;
 import com.limelight.nvstream.wol.WakeOnLanSender;
-import com.limelight.preferences.AddComputerManually;
+import com.limelight.preferences.AddComputerManuallyActivity;
 import com.limelight.preferences.GlPreferences;
 import com.limelight.preferences.PreferenceConfiguration;
 import com.limelight.preferences.StreamSettings;
@@ -161,7 +161,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
         addComputerButton.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent i = new Intent(PcView.this, AddComputerManually.class);
+                Intent i = new Intent(PcView.this, AddComputerManuallyActivity.class);
                 startActivity(i);
             }
         });
