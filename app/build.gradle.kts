@@ -1,21 +1,25 @@
-apply plugin: 'com.android.application'
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.compose.compiler)
+}
 
 android {
-    ndkVersion "27.0.12077973"
+    ndkVersion = "27.0.12077973"
 
-    compileSdk 34
+    compileSdk = 34
 
-    namespace 'com.limelight'
+    namespace = "com.limelight"
 
     defaultConfig {
-        minSdk 21
-        targetSdk 34
+        minSdk = 21
+        targetSdk = 34
 
-        versionName "12.1.250118"
+        versionName = "12.1.250118"
         versionCode = 43
 
         // Generate native debug symbols to allow Google Play to symbolicate our native crashes
-        ndk.debugSymbolLevel = 'FULL'
+        ndk.debugSymbolLevel = "FULL"
     }
 
     flavorDimensions.add("root")
@@ -25,52 +29,50 @@ android {
     }
 
     productFlavors {
-        root {
+        create("root") {
             // Android O has native mouse capture, so don't show the rooted
             // version to devices running O on the Play Store.
-            maxSdk 25
+            maxSdk = 25
 
             externalNativeBuild {
                 ndkBuild {
-                    arguments "PRODUCT_FLAVOR=root"
+                    arguments += "PRODUCT_FLAVOR=root"
                 }
             }
 
-            resValue "string",
+            resValue("string",
                     "obtainium_app_url",
-                    "data:text/html;base64,PGgxPlJvb3QgYnVpbGQgaXMgbm90IGF2YWlsYWJsZTwvaDE+"
+                    "data:text/html;base64,PGgxPlJvb3QgYnVpbGQgaXMgbm90IGF2YWlsYWJsZTwvaDE+")
 
-            applicationId "com.limelight.root"
-            dimension "root"
-            buildConfigField "boolean", "ROOT_BUILD", "true"
+            applicationId = "com.limelight.root"
+            dimension = "root"
+            buildConfigField("boolean", "ROOT_BUILD", "true")
         }
 
-        nonRoot_game {
+        create("nonRoot_game") {
             externalNativeBuild {
                 ndkBuild {
-                    arguments "PRODUCT_FLAVOR=nonRoot"
+                    arguments += "PRODUCT_FLAVOR=nonRoot"
                 }
             }
 
-            resValue "string",
+            resValue("string",
                     "obtainium_app_url",
-                    "https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.limelight.noir%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2FClassicOldSong%2Fmoonlight-android%22%2C%22author%22%3A%22ClassicOldSong%22%2C%22name%22%3A%22Artemis%22%2C%22additionalSettings%22%3A%22%7B%5C%22apkFilterRegEx%5C%22%3A%5C%22nonRoot%5C%22%2C%5C%22matchGroutToUse%5C%22%3A%5C%22%241%5C%22%2C%5C%22versionExtractionRegEx%5C%22%3A%5C%22v(.%2B)%5C%22%7D%22%7D"
+                    "https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.limelight.noir%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2FClassicOldSong%2Fmoonlight-android%22%2C%22author%22%3A%22ClassicOldSong%22%2C%22name%22%3A%22Artemis%22%2C%22additionalSettings%22%3A%22%7B%5C%22apkFilterRegEx%5C%22%3A%5C%22nonRoot%5C%22%2C%5C%22matchGroutToUse%5C%22%3A%5C%22%241%5C%22%2C%5C%22versionExtractionRegEx%5C%22%3A%5C%22v(.%2B)%5C%22%7D%22%7D")
 
-            applicationId "com.limelight"
-            dimension "root"
-            buildConfigField "boolean", "ROOT_BUILD", "false"
+            applicationId = "com.limelight"
+            dimension = "root"
+            buildConfigField("boolean", "ROOT_BUILD", "false")
         }
     }
 
     compileOptions {
-        encoding "UTF-8"
-        sourceCompatibility JavaVersion.VERSION_11
-        targetCompatibility JavaVersion.VERSION_11
+        encoding = "UTF-8"
     }
 
     lint {
-        disable 'MissingTranslation'
-        lintConfig file('lint.xml')
+        disable.add("MissingTranslation")
+        lintConfig = file("lint.xml")
     }
 
     bundle {
@@ -89,13 +91,13 @@ android {
 
     buildTypes {
         debug {
-            applicationIdSuffix ".noirdebug"
-            resValue "string", "app_label", "Diana"
-            resValue "string", "app_label_root", "Diana (Root)"
-            resValue "string", "app_label_game", "Diana (Game)"
+            applicationIdSuffix = ".moonknightdebug"
+            resValue("string", "app_label", "Diana")
+            resValue("string", "app_label_root", "Diana (Root)")
+            resValue("string", "app_label_game", "Diana (Game)")
 
-            minifyEnabled true
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            isMinifyEnabled = false
+            proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
         }
         release {
             // To whomever is releasing/using an APK in release mode with
@@ -128,34 +130,52 @@ android {
             // is to please change the applicationId before you publish.
             //
             // TL;DR: Leave the following line alone!
-            applicationIdSuffix ".noir"
-            resValue "string", "app_label", "Artemis"
-            resValue "string", "app_label_root", "Artemis (Root)"
-            resValue "string", "app_label_game", "Artemis (Game)"
+            applicationIdSuffix = ".moonknight"
+            resValue("string", "app_label", "Artemis")
+            resValue("string", "app_label_root", "Artemis (Root)")
+            resValue("string", "app_label_game", "Artemis (Game)")
 
-            minifyEnabled true
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            isMinifyEnabled = true
+            proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
         }
     }
 
     externalNativeBuild {
         ndkBuild {
-            path "src/main/jni/Android.mk"
+            path = file("src/main/jni/Android.mk")
         }
     }
 }
 
+kotlin {
+    jvmToolchain(17)
+}
+
 dependencies {
-    implementation 'org.bouncycastle:bcprov-jdk18on:1.77'
-    implementation 'org.bouncycastle:bcpkix-jdk18on:1.77'
-    implementation 'org.jcodec:jcodec:0.2.5'
-    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
-    implementation 'org.jmdns:jmdns:3.5.9'
-    implementation 'com.github.cgutman:ShieldControllerExtensions:1.0.1'
-    implementation 'com.google.code.gson:gson:2.10.1'
-    implementation 'androidx.annotation:annotation:1.9.0'
-    implementation 'androidx.cardview:cardview:1.0.0'
-    implementation 'androidx.appcompat:appcompat:1.7.0'
-    implementation 'androidx.preference:preference:1.2.1'
-    implementation 'com.github.ByteHamster:SearchPreference:v2.5.1'
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.kotlin.stdlib)
+    implementation(libs.kotlin.coroutines)
+
+    implementation(libs.bcprov.jdk18on)
+    implementation(libs.bcpkix.jdk18on)
+    implementation(libs.jcodec)
+    implementation(libs.okhttp)
+    implementation(libs.jmdns)
+    implementation(libs.shieldcontrollerextensions)
+    implementation(libs.gson)
+    implementation(libs.androidx.annotation)
+    implementation(libs.androidx.cardview)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.preference)
+    implementation(libs.searchpreference)
+
+    val composeBom = platform(libs.compose.bom)
+    implementation(composeBom)
+    androidTestImplementation(composeBom)
+
+    implementation(libs.compose.material3)
+    implementation(libs.compose.ui.tooling.preview)
+    debugImplementation(libs.compose.ui.tooling)
+
+    implementation(libs.androidx.activity.compose)
 }

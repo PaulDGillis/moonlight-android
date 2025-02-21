@@ -1,0 +1,51 @@
+[versions]
+activityCompose = "1.9.3"
+composeBom = "2025.02.00"
+annotation = "1.9.0"
+appcompat = "1.7.0"
+bcprovJdk18on = "1.77"
+cardview = "1.0.0"
+coreKtx = "1.13.1"
+gson = "2.10.1"
+jcodec = "0.2.5"
+jmdns = "3.5.9"
+kotlin = "2.1.0"
+kotlinCoroutines = "1.10.1"
+androidGradlePlugin = "8.5.1"
+kotlinStdlib = "2.1.0"
+okhttp = "4.12.0"
+preference = "1.2.1"
+searchpreference = "v2.5.1"
+shieldcontrollerextensions = "1.0.1"
+
+[libraries]
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
+compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
+compose-material3 = { module = "androidx.compose.material3:material3" }
+compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
+compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+
+androidx-annotation = { module = "androidx.annotation:annotation", version.ref = "annotation" }
+androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
+androidx-cardview = { module = "androidx.cardview:cardview", version.ref = "cardview" }
+androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
+androidx-preference = { module = "androidx.preference:preference", version.ref = "preference" }
+
+bcpkix-jdk18on = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bcprovJdk18on" }
+bcprov-jdk18on = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bcprovJdk18on" }
+gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
+jcodec = { module = "org.jcodec:jcodec", version.ref = "jcodec" }
+jmdns = { module = "org.jmdns:jmdns", version.ref = "jmdns" }
+
+kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlinStdlib" }
+kotlin-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinCoroutines" }
+
+okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
+searchpreference = { module = "com.github.ByteHamster:SearchPreference", version.ref = "searchpreference" }
+shieldcontrollerextensions = { module = "com.github.cgutman:ShieldControllerExtensions", version.ref = "shieldcontrollerextensions" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "androidGradlePlugin" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }

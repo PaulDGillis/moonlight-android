@@ -43,3 +43,6 @@ app/.externalNativeBuild/
 
 # NDK stuff
 .cxx/
+
+# Kotlin
+.kotlin
