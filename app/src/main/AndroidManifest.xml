@@ -43,6 +43,7 @@
         android:required="false"/>
 
     <application
+        android:name=".MoonKnightApplication"
         android:allowBackup="true"
         android:fullBackupContent="@xml/backup_rules"
         android:dataExtractionRules="@xml/backup_rules_s"
@@ -197,7 +198,7 @@
         </activity>
 
 
-        <activity android:name=".DebugInfoActivity"
+        <activity android:name=".debug.DebugInfoActivity"
             android:launchMode="singleTask"
             android:theme="@style/StreamTheme"/>
 

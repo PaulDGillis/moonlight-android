@@ -501,7 +501,7 @@
     <string name="debug_info_please_choose">请选择</string>
     <string name="debug_info_no_gamepad_detected">目前没有检测到手柄，请连接手柄，点击刷新按钮，再尝试！</string>
     <string name="debug_info_no_vibrator">手柄没有识别到震动马达！</string>
-    <string name="debug_info_set_amplitude">设置振幅0-255(只对HD震动生效)</string>
+    <string name="debug_info_set_amplitude">设置振幅0-255</string>
     <string name="debug_info_name">名称：</string>
     <string name="debug_info_sensors">传感器：</string>
     <string name="debug_info_no_relevant_driver">无（没有相关驱动或者手柄不支持）</string>

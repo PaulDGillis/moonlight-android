@@ -155,6 +155,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlin.stdlib)
     implementation(libs.kotlin.coroutines)
+    implementation(libs.koin.android.compose)
 
     implementation(libs.bcprov.jdk18on)
     implementation(libs.bcpkix.jdk18on)

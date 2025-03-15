@@ -529,7 +529,7 @@
     <string name="debug_info_please_choose">Please Choose</string>
     <string name="debug_info_no_gamepad_detected">No gamepad detected, please connect a gamepad, tap refresh, and try again!</string>
     <string name="debug_info_no_vibrator">No vibrator detected on the gamepad!</string>
-    <string name="debug_info_set_amplitude">Set Amplitude 0-255 (Effective only for HD Vibration)</string>
+    <string name="debug_info_set_amplitude">Set Amplitude 0-255</string>
     <string name="debug_info_name">Name: </string>
     <string name="debug_info_sensors">Sensors: </string>
     <string name="debug_info_no_relevant_driver">None (no relevant driver or gamepad not supported)</string>

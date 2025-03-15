@@ -45,7 +45,7 @@ import android.widget.EditText;
 import android.widget.Toast;
 
 import com.google.gson.Gson;
-import com.limelight.DebugInfoActivity;
+import com.limelight.debug.DebugInfoActivity;
 import com.limelight.BuildConfig;
 import com.limelight.GameMenu;
 import com.limelight.LimeLog;
