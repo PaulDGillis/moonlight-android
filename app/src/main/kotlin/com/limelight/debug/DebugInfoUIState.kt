@@ -1,12 +1,25 @@
 package com.limelight.debug
 
-data class DebugPlatformState(
-    val hasVibrator: Boolean = false, // Android Vibrator
-    val testVibrationAmplitude: Int = 220,
-    val inputDevices: List<InputDeviceUIState> = emptyList()
+data class DebugScreenUIState(
+    val hasOsVibrator: Boolean = false, // Android Vibrator
+    val settingsState: DebugSettingsUIState = DebugSettingsUIState(),
+    val inputDevicesState: DebugInputDevicesUIState = DebugInputDevicesUIState.Loading
 )
 
-data class InputDeviceUIState(
+data class DebugSettingsUIState(
+    val isSettingsShowing: Boolean = false,
+    val isContinuousVibration: Boolean = false,
+    val amplitudeForTestVibration: Int = 220,
+)
+
+sealed class DebugInputDevicesUIState {
+    data object Loading: DebugInputDevicesUIState()
+    data class Success(
+        val inputDevices: List<DebugInputDeviceUIState> = emptyList()
+    ): DebugInputDevicesUIState()
+}
+
+data class DebugInputDeviceUIState(
     val id: Int = -1,
     val name: String = "",
     val sensorsState: SensorUIState = SensorUIState.None,

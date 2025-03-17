@@ -24,14 +24,11 @@ public class HelpActivity extends Activity {
         super.onCreate(savedInstanceState);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            onBackInvokedCallback = new OnBackInvokedCallback() {
-                @Override
-                public void onBackInvoked() {
-                    // We should always be able to go back because we unregister our callback
-                    // when we can't go back. Nonetheless, we will still check anyway.
-                    if (webView.canGoBack()) {
-                        webView.goBack();
-                    }
+            onBackInvokedCallback = () -> {
+                // We should always be able to go back because we unregister our callback
+                // when we can't go back. Nonetheless, we will still check anyway.
+                if (webView.canGoBack()) {
+                    webView.goBack();
                 }
             };
         }

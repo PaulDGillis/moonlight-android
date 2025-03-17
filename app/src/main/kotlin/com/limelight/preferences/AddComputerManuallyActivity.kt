@@ -1,25 +1,16 @@
 package com.limelight.preferences
 
-import android.app.Activity
 import android.app.AlertDialog
 import android.content.ComponentName
-import android.content.Context.BIND_AUTO_CREATE
 import android.content.DialogInterface
 import android.content.Intent
 import android.content.ServiceConnection
 import android.net.Uri
 import android.os.Bundle
 import android.os.IBinder
-import android.view.KeyEvent
-import android.view.View
-import android.view.inputmethod.EditorInfo
-import android.view.inputmethod.InputMethodManager
-import android.widget.TextView
-import android.widget.TextView.OnEditorActionListener
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.core.content.ContextCompat.startActivity
 import com.limelight.PcView
 import com.limelight.R
 import com.limelight.computers.ComputerManagerService
@@ -36,20 +27,16 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.take
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import org.jcodec.common.dct.SparseIDCT.finish
 import java.lang.Exception
 import java.lang.IllegalArgumentException
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.NetworkInterface
 import java.util.Collections
-import java.util.concurrent.LinkedBlockingQueue
-import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
+import androidx.core.net.toUri
 
 class AddComputerManuallyActivity : ComponentActivity() {
     private var managerBinder: ComputerManagerBinder? = null
@@ -72,13 +59,13 @@ class AddComputerManuallyActivity : ComponentActivity() {
     private fun isWrongSubnetSiteLocalAddress(address: String?): Boolean {
         try {
             val targetAddress = InetAddress.getByName(address)
-            if (targetAddress !is Inet4Address || !targetAddress.isSiteLocalAddress()) {
+            if (targetAddress !is Inet4Address || !targetAddress.isSiteLocalAddress) {
                 return false
             }
 
             // We have a site-local address. Look for a matching local interface.
             for (iface in Collections.list<NetworkInterface>(NetworkInterface.getNetworkInterfaces())) {
-                for (addr in iface.getInterfaceAddresses()) {
+                for (addr in iface.interfaceAddresses) {
                     if (addr.address !is Inet4Address || !addr.address
                             .isSiteLocalAddress
                     ) {
@@ -86,7 +73,7 @@ class AddComputerManuallyActivity : ComponentActivity() {
                         continue
                     }
 
-                    val targetAddrBytes = targetAddress.getAddress()
+                    val targetAddrBytes = targetAddress.address
                     val ifaceAddrBytes = addr.address.address
 
                     // Compare prefix to ensure it's the same
@@ -117,14 +104,14 @@ class AddComputerManuallyActivity : ComponentActivity() {
     private fun parseRawUserInputToUri(rawUserInput: String?): Uri? {
         // Try adding a scheme and parsing the remaining input.
         // This handles input like 127.0.0.1:47989, [::1], [::1]:47989, and 127.0.0.1.
-        var uri = Uri.parse("art://$rawUserInput")
+        var uri = "art://$rawUserInput".toUri()
         if (uri.host != null && !uri.host!!.isEmpty()) {
             return uri
         }
 
         // Attempt to escape the input as an IPv6 literal.
         // This handles input like ::1.
-        uri = Uri.parse("art://[$rawUserInput]")
+        uri = "art://[$rawUserInput]".toUri()
         if (uri.host != null && !uri.host!!.isEmpty()) {
             return uri
         }
@@ -237,7 +224,7 @@ class AddComputerManuallyActivity : ComponentActivity() {
                     val passphrase = uri.getQueryParameter("passphrase")
                     if (pin != null && passphrase != null) {
                         val intent = Intent(this@AddComputerManuallyActivity, PcView::class.java)
-                        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK)
+                        intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK
                         intent.putExtra("hostname", uri.host)
                         intent.putExtra("port", uri.port)
                         intent.putExtra("pin", pin)
