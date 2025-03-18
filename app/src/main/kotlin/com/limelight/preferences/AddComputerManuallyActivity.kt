@@ -1,8 +1,7 @@
 package com.limelight.preferences
 
-import android.app.AlertDialog
 import android.content.ComponentName
-import android.content.DialogInterface
+import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.net.Uri
@@ -23,9 +22,7 @@ import com.limelight.utils.Dialog
 import com.limelight.utils.ServerHelper
 import com.limelight.utils.SpinnerDialog
 import com.limelight.utils.UiHelper
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -35,26 +32,14 @@ import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.NetworkInterface
 import java.util.Collections
-import kotlin.coroutines.coroutineContext
 import androidx.core.net.toUri
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 
 class AddComputerManuallyActivity : ComponentActivity() {
-    private var managerBinder: ComputerManagerBinder? = null
-
     private val computersToAddChannel = Channel<String>()
-    private val serviceConnectionScope = CoroutineScope(Dispatchers.IO)
-
-    private val serviceConnection: ServiceConnection = object : ServiceConnection {
-        override fun onServiceConnected(className: ComponentName?, binder: IBinder?) {
-            managerBinder = (binder as ComputerManagerBinder?)
-            serviceConnectionScope.launch { startAddThread() }
-        }
-
-        override fun onServiceDisconnected(className: ComponentName?) {
-            serviceConnectionScope.cancel()
-            managerBinder = null
-        }
-    }
 
     private fun isWrongSubnetSiteLocalAddress(address: String?): Boolean {
         try {
@@ -105,14 +90,14 @@ class AddComputerManuallyActivity : ComponentActivity() {
         // Try adding a scheme and parsing the remaining input.
         // This handles input like 127.0.0.1:47989, [::1], [::1]:47989, and 127.0.0.1.
         var uri = "art://$rawUserInput".toUri()
-        if (uri.host != null && !uri.host!!.isEmpty()) {
+        if (uri.host?.isNotBlank() == true) {
             return uri
         }
 
         // Attempt to escape the input as an IPv6 literal.
         // This handles input like ::1.
         uri = "art://[$rawUserInput]".toUri()
-        if (uri.host != null && !uri.host!!.isEmpty()) {
+        if (uri.host?.isNotBlank() == true) {
             return uri
         }
 
@@ -120,7 +105,7 @@ class AddComputerManuallyActivity : ComponentActivity() {
     }
 
     @Throws(InterruptedException::class)
-    private fun doAddPc(rawUserInput: String?) {
+    private fun doAddPc(managerBinder: ComputerManagerBinder, rawUserInput: String?) {
         var wrongSiteLocal = false
         var invalidInput = false
         var success: Boolean
@@ -135,7 +120,7 @@ class AddComputerManuallyActivity : ComponentActivity() {
             val details = ComputerDetails()
 
             // Check if we parsed a host address successfully
-            if (uri != null && uri.host != null && !uri.host!!.isEmpty()) {
+            if (uri?.host?.isNotBlank() == true) {
                 val host = uri.host
                 var port = uri.port
 
@@ -145,7 +130,7 @@ class AddComputerManuallyActivity : ComponentActivity() {
                 }
 
                 details.manualAddress = AddressTuple(host, port)
-                success = managerBinder!!.addComputerBlocking(details)
+                success = managerBinder.addComputerBlocking(details) == true
                 if (!success) {
                     wrongSiteLocal = isWrongSubnetSiteLocalAddress(host)
                 }
@@ -220,31 +205,21 @@ class AddComputerManuallyActivity : ComponentActivity() {
                         this@AddComputerManuallyActivity.finish()
                     }
 
-                    val pin = uri!!.getQueryParameter("pin")
-                    val passphrase = uri.getQueryParameter("passphrase")
+                    val pin = uri?.getQueryParameter("pin")
+                    val passphrase = uri?.getQueryParameter("passphrase")
                     if (pin != null && passphrase != null) {
-                        val intent = Intent(this@AddComputerManuallyActivity, PcView::class.java)
-                        intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK
-                        intent.putExtra("hostname", uri.host)
-                        intent.putExtra("port", uri.port)
-                        intent.putExtra("pin", pin)
-                        intent.putExtra("passphrase", passphrase)
+                        val intent = Intent(this@AddComputerManuallyActivity, PcView::class.java).apply {
+                            flags = Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK
+                            putExtra("hostname", uri.host)
+                            putExtra("port", uri.port)
+                            putExtra("pin", pin)
+                            putExtra("passphrase", passphrase)
+                        }
 
                         startActivity(intent)
                     }
                 }
             })
-        }
-    }
-
-    private suspend fun startAddThread() {
-        while (coroutineContext.isActive) {
-            try {
-                val computer = computersToAddChannel.receive()
-                doAddPc(computer)
-            } catch (_: InterruptedException) {
-                return
-            }
         }
     }
 
@@ -255,13 +230,16 @@ class AddComputerManuallyActivity : ComponentActivity() {
         SpinnerDialog.closeDialogs(this)
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
+    suspend fun bindServiceAndWait(context: Context, intent: Intent, flags: Int) = suspendCoroutine<Pair<ServiceConnection, ComputerManagerBinder>> { continuation ->
+        val serviceConnection: ServiceConnection = object : ServiceConnection {
+            override fun onServiceConnected(className: ComponentName?, binder: IBinder?) {
+                val managerBinder = binder as? ComputerManagerBinder ?: return
+                continuation.resume(Pair(this, managerBinder))
+            }
 
-        if (managerBinder != null) {
-            serviceConnectionScope.cancel()
-            unbindService(serviceConnection)
+            override fun onServiceDisconnected(className: ComponentName?) {}
         }
+        context.bindService(intent, serviceConnection, flags)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -269,22 +247,29 @@ class AddComputerManuallyActivity : ComponentActivity() {
 
         UiHelper.setLocale(this)
 
-        setContent {
-            AddComputerManuallyScreen {
-                computersToAddChannel.trySend(it)
-            }
-        }
-
         // TODO figure out what this is actually doing
         //  UiHelper.notifyNewRootView(this)
 
-        // Bind to the ComputerManager service
-        bindService(
-            Intent(
+        lifecycleScope.launch {
+            // Bind to the ComputerManager service
+            val (serviceConn, managerBinding) = bindServiceAndWait(this@AddComputerManuallyActivity, Intent(
                 this@AddComputerManuallyActivity,
                 ComputerManagerService::class.java
-            ), serviceConnection, BIND_AUTO_CREATE
-        )
+            ), BIND_AUTO_CREATE)
+
+            withContext(Dispatchers.IO) {
+                try {
+                    while (coroutineContext.isActive) {
+                        try {
+                            val computer = computersToAddChannel.receive()
+                            doAddPc(managerBinding, computer)
+                        } catch (_: InterruptedException) {}
+                    }
+                } finally {
+                    this@AddComputerManuallyActivity.unbindService(serviceConn)
+                }
+            }
+        }
 
 
         // Check if we have been called from deep link
@@ -296,34 +281,21 @@ class AddComputerManuallyActivity : ComponentActivity() {
         val server = data.authority
         val query = data.query
 
-        // TODO Fix this hostText!!.text = server
+        // TODO Fix this hostText?.text = server
 
-        if (query != null && !query.isEmpty()) {
-            var hostName = data.getQueryParameter("name")
-            hostName = if (hostName != null && !hostName.isEmpty()) {
-                "$hostName ($server)"
-            } else {
-                server
+        val hostName = if (query?.isNotEmpty() == true) {
+            data.getQueryParameter("name").let { name ->
+                if (name?.isNotBlank() == true)
+                    "$name ($server)"
+                else
+                    server
             }
+        } else null // TODO this should show PcConfirmDialog
 
-            val builder = AlertDialog.Builder(this)
-            builder.setTitle(R.string.pair_pc_confirm_title)
-            builder.setMessage(getString(R.string.pair_pc_confirm_message, hostName))
-
-            builder.setPositiveButton(
-                getString(R.string.proceed),
-                DialogInterface.OnClickListener { dialog: DialogInterface?, which: Int ->
-                    dialog!!.dismiss()
-                    finish()
-                    computersToAddChannel.trySend("$server?$query")
-                })
-
-            builder.setNegativeButton(
-                getString(R.string.cancel),
-                DialogInterface.OnClickListener { dialog: DialogInterface?, which: Int -> dialog!!.dismiss() })
-
-            val dialog = builder.create()
-            dialog.show()
+        setContent {
+            AddComputerManuallyScreen {
+                computersToAddChannel.trySend(it)
+            }
         }
     }
 }
