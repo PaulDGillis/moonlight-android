@@ -2,6 +2,7 @@ package com.limelight
 
 import android.app.Application
 import com.limelight.debug.di.debugModule
+import com.limelight.preferences.di.preferencesModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
@@ -13,7 +14,7 @@ class MoonKnightApplication: Application() {
         startKoin {
             androidLogger()
             androidContext(this@MoonKnightApplication)
-            modules(debugModule)
+            modules(debugModule, preferencesModule)
         }
     }
 }
