@@ -1,6 +1,7 @@
 package com.limelight.grid.assets;
 
 import android.content.Context;
+import android.graphics.BitmapFactory;
 
 import com.limelight.LimeLog;
 import com.limelight.binding.PlatformBinding;

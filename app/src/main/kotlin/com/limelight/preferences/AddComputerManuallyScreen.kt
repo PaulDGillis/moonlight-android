@@ -152,7 +152,7 @@ fun AddPcTextField(
             placeholder = { Text(stringResource(R.string.ip_hint)) },
             singleLine = true,
             keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Text,
+                keyboardType = KeyboardType.Uri,
                 autoCorrectEnabled = false,
                 imeAction = ImeAction.Done
             ),

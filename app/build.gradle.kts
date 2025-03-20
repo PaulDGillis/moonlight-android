@@ -174,6 +174,10 @@ dependencies {
     implementation(composeBom)
     androidTestImplementation(composeBom)
 
+    implementation(libs.ktor.client)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.ktor3)
+
     implementation(libs.compose.material3)
     implementation(libs.compose.ui.tooling.preview)
     debugImplementation(libs.compose.ui.tooling)
