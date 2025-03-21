@@ -14,8 +14,8 @@ koin = "4.0.2"
 kotlin = "2.1.0"
 kotlinCoroutines = "1.10.1"
 ktor = "3.1.1"
-androidGradlePlugin = "8.5.1"
-kotlinStdlib = "2.1.0"
+androidGradlePlugin = "8.9.0"
+kotlinStdlib = "2.1.10"
 okhttp = "4.12.0"
 preference = "1.2.1"
 searchpreference = "v2.5.1"
@@ -46,6 +46,8 @@ koin-android-compose = { module = "io.insert-koin:koin-androidx-compose", versio
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-network-ktor3 = { module = "io.coil-kt.coil3:coil-network-ktor3", version.ref = "coil" }
 ktor-client = { module = "io.ktor:ktor-client-android", version.ref = "ktor" }
+ktor-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-serialization-xml = { module = "io.ktor:ktor-serialization-kotlinx-xml", version.ref = "ktor" }
 
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 searchpreference = { module = "com.github.ByteHamster:SearchPreference", version.ref = "searchpreference" }
@@ -56,3 +58,4 @@ android-application = { id = "com.android.application", version.ref = "androidGr
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlinx-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

@@ -9,6 +9,8 @@ import com.limelight.StringResource
 import com.limelight.computers.ComputerManagerService.ComputerManagerBinder
 import com.limelight.nvstream.http.ComputerDetails
 import com.limelight.nvstream.http.ComputerDetails.AddressTuple
+import com.limelight.nvstream.http.KtorClient
+import com.limelight.nvstream.http.LimelightCryptoProvider
 import com.limelight.nvstream.http.NvHTTP
 import com.limelight.nvstream.jni.MoonBridge
 import com.limelight.utils.ServerHelper
@@ -25,6 +27,9 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import org.koin.core.component.KoinComponent
+import org.koin.java.KoinJavaComponent.inject
 import java.lang.IllegalArgumentException
 import java.net.Inet4Address
 import java.net.InetAddress
@@ -55,7 +60,7 @@ data class AddComputerManuallyUIState(
     val addPcState: AddPcState? = null
 )
 
-class AddComputerManuallyViewModel : ViewModel() {
+class AddComputerManuallyViewModel : ViewModel(), KoinComponent {
 
     private val computersToAddChannel = Channel<String>()
     private val managerBindingStateFlow = MutableStateFlow<ComputerManagerBinder?>(null)
@@ -77,6 +82,16 @@ class AddComputerManuallyViewModel : ViewModel() {
             addComputerResponse
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AddComputerManuallyUIState())
+
+    val provider: LimelightCryptoProvider by inject(LimelightCryptoProvider::class.java)
+
+    init {
+        val client = KtorClient(AddressTuple("192.168.1.150", NvHTTP.DEFAULT_HTTP_PORT), provider)
+        viewModelScope.launch {
+            val serverInfo = client.getServerInfo()
+            println(serverInfo)
+        }
+    }
 
     fun onIpChanged(ip: String) {
         val hostAddress = ip.trim()

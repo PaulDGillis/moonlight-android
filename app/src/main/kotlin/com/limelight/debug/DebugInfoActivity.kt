@@ -5,7 +5,7 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.material3.ExperimentalMaterial3Api
-import com.example.compose.MKAppTheme
+import com.limelight.ui.theme.MKAppTheme
 
 class DebugInfoActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)

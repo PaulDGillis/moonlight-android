@@ -45,7 +45,7 @@ import java.io.StringReader
 import androidx.core.content.edit
 
 class AppView : Activity(), AdapterFragmentCallbacks {
-//    private var appGridAdapter: AppGridAdapter? = null
+    private var appGridAdapter: AppGridAdapter? = null
     private var uuidString: String? = null
     private var shortcutHelper: ShortcutHelper? = null
 

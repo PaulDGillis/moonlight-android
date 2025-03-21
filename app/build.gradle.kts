@@ -2,18 +2,19 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.kotlinx.serialization)
 }
 
 android {
     ndkVersion = "27.0.12077973"
 
-    compileSdk = 34
+    compileSdk = 35
 
     namespace = "com.limelight"
 
     defaultConfig {
         minSdk = 21
-        targetSdk = 34
+        targetSdk = 35
 
         versionName = "12.1.250118"
         versionCode = 43
@@ -175,6 +176,8 @@ dependencies {
     androidTestImplementation(composeBom)
 
     implementation(libs.ktor.client)
+    implementation(libs.ktor.content.negotiation)
+    implementation(libs.ktor.serialization.xml)
     implementation(libs.coil.compose)
     implementation(libs.coil.network.ktor3)
 
