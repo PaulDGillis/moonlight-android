@@ -66,7 +66,7 @@ public class NvHTTP {
     private String deviceName;
     private PairingManager pm;
 
-    private static final int DEFAULT_HTTPS_PORT = 47984;
+    public static final int DEFAULT_HTTPS_PORT = 47984;
     public static final int DEFAULT_HTTP_PORT = 47989;
     public static final int SHORT_CONNECTION_TIMEOUT = 3000;
     public static final int LONG_CONNECTION_TIMEOUT = 5000;

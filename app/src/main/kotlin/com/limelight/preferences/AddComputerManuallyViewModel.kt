@@ -12,6 +12,8 @@ import com.limelight.nvstream.http.ComputerDetails.AddressTuple
 import com.limelight.nvstream.http.KtorClient
 import com.limelight.nvstream.http.LimelightCryptoProvider
 import com.limelight.nvstream.http.NvHTTP
+import com.limelight.nvstream.http.PairingManagerKtx
+import com.limelight.nvstream.http.PairingRepo
 import com.limelight.nvstream.jni.MoonBridge
 import com.limelight.utils.ServerHelper
 import kotlinx.coroutines.Dispatchers
@@ -86,9 +88,17 @@ class AddComputerManuallyViewModel : ViewModel(), KoinComponent {
     val provider: LimelightCryptoProvider by inject(LimelightCryptoProvider::class.java)
 
     init {
-        val client = KtorClient(AddressTuple("192.168.1.150", NvHTTP.DEFAULT_HTTP_PORT), provider)
+        val client = KtorClient(
+            "192.168.1.150",
+            NvHTTP.DEFAULT_HTTP_PORT,
+            uniqueId = "28D06A15-705C-882C-AB0D-81D5E923897E",
+            provider
+        )
+        val pairingRepo = PairingRepo(client)
+        val pairingManagerKtx = PairingManagerKtx(pairingRepo, provider)
         viewModelScope.launch {
             val serverInfo = client.getServerInfo()
+            pairingManagerKtx.pair(serverInfo, "1234", null)
             println(serverInfo)
         }
     }
