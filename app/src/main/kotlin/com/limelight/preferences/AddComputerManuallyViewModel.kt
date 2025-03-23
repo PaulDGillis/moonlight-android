@@ -12,7 +12,7 @@ import com.limelight.nvstream.http.ComputerDetails.AddressTuple
 import com.limelight.nvstream.http.KtorClient
 import com.limelight.nvstream.http.LimelightCryptoProvider
 import com.limelight.nvstream.http.NvHTTP
-import com.limelight.nvstream.http.PairingManagerKtx
+import com.limelight.nvstream.http.PairingManager
 import com.limelight.nvstream.http.PairingRepo
 import com.limelight.nvstream.jni.MoonBridge
 import com.limelight.utils.ServerHelper
@@ -95,10 +95,10 @@ class AddComputerManuallyViewModel : ViewModel(), KoinComponent {
             provider
         )
         val pairingRepo = PairingRepo(client)
-        val pairingManagerKtx = PairingManagerKtx(pairingRepo, provider)
+        val pairingManager = PairingManager(pairingRepo)
         viewModelScope.launch {
             val serverInfo = client.getServerInfo()
-            pairingManagerKtx.pair(serverInfo, "1234", null)
+            pairingManager.pair(serverInfo, "1234", null)
             println(serverInfo)
         }
     }

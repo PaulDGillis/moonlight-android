@@ -21,20 +21,14 @@ import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.util.Locale
 
-class PairingManagerKtx(
-    private val pairingRepo: PairingRepo,
-    cryptoProvider: LimelightCryptoProvider
+class PairingManager(
+    private val pairingRepo: PairingRepo
 ) {
-    private val pk: PrivateKey = cryptoProvider.getClientPrivateKey()
-    private val cert: X509Certificate = cryptoProvider.getClientCertificate()
-    private val pemCertBytes: ByteArray = cryptoProvider.getPemEncodedClientCertificate()
+    private val pk: PrivateKey = pairingRepo.ktorClient.cryptoProvider.clientPrivateKey
+    private val cert: X509Certificate = pairingRepo.ktorClient.cryptoProvider.clientCertificate
+    private val pemCertBytes: ByteArray = pairingRepo.ktorClient.cryptoProvider.pemEncodedClientCertificate
 
-    enum class PairState {
-        PAIRED,
-        PIN_WRONG,
-        FAILED,
-        ALREADY_IN_PROGRESS
-    }
+    enum class PairState { NOT_PAIRED, PAIRED, PIN_WRONG, FAILED, ALREADY_IN_PROGRESS }
 
     private fun generateRandom16ByteArray(): ByteArray {
         val rand = ByteArray(16)

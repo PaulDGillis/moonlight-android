@@ -1,18 +1,25 @@
 package com.limelight.nvstream.http
 
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
-import io.ktor.http.ParametersBuilder
 import io.ktor.http.appendPathSegments
+import io.ktor.http.parameters
 import kotlinx.serialization.decodeFromString
 import io.ktor.serialization.kotlinx.xml.DefaultXml
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import nl.adaptivity.xmlutil.serialization.XML
 import nl.adaptivity.xmlutil.serialization.XmlElement
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
+@SerialName("root")
 @Serializable
 data class GetServerCertResponse(
+    @SerialName("status_code")
+    val statusCode: Int = 0,
+
     @XmlElement
     @SerialName("paired")
     val pairedStatus: Int,
@@ -55,58 +62,53 @@ class PairingRepo(
     val ktorClient: KtorClient
 ) {
     // Testing out this idea, Probably will remove later
-    sealed class Params(open val pValue: String) {
-        sealed class UpdateState(override val pValue: String): Params(pValue) {
-            object ToOne: UpdateState("1")
+    sealed interface Params {
+        object UpdateState: Params {
+            const val KEY = "updateState"
+
+            const val ONE = "1"
         }
 
-        sealed class Phrase(override val pValue: String): Params(pValue) {
-            object GetServerCert: Phrase("getservercert")
-            object PairChallenge: Phrase("pairchallenge")
+        object Phrase: Params {
+            const val KEY = "phrase"
+
+            const val GET_SERVER_CERT = "getservercert"
+            const val PAIR_CHALLENGE = "pairchallenge"
         }
 
-        class Salt(override val pValue: String): Params(pValue)
-        class ClientCert(override val pValue: String): Params(pValue)
-        class OtpAuth(override val pValue: String): Params(pValue)
-        class ClientChallenge(override val pValue: String): Params(pValue)
-        class ServerChallengeResponse(override val pValue: String): Params(pValue)
-        class ClientPairingSecret(override val pValue: String): Params(pValue)
-
-        val pKey: String = when (this) {
-            is Phrase -> "phrase"
-            is UpdateState -> "updateState"
-            is Salt -> "salt"
-            is ClientCert -> "clientcert"
-            is ClientChallenge -> "clientchallenge"
-            is ClientPairingSecret -> "clientpairingsecret"
-            is OtpAuth -> "otpauth"
-            is ServerChallengeResponse -> "serverchallengeresp"
-        }
-    }
-
-    private fun ParametersBuilder.append(builderAction: MutableList<Params>.() -> Unit) {
-        buildList(builderAction).forEach { append(it.pKey, it.pValue) }
+        object Salt { const val KEY = "salt" }
+        object ClientCert { const val KEY = "clientcert" }
+        object OtpAuth { const val KEY = "otpauth" }
+        object ClientChallenge { const val KEY = "clientchallenge" }
+        object ServerChallengeResponse { const val KEY = "serverchallengeresp" }
+        object ClientPairingSecret { const val KEY = "clientpairingsecret" }
     }
 
     private val xml: XML = DefaultXml
+    // TODO find better solution for this
     private val notHTTPSException = Exception("HTTPS Required for function")
 
+    @OptIn(ExperimentalUuidApi::class)
     suspend fun getServerCert(
         salt: String,
         clientCert: String,
         passphraseHexString: String? = null
     ): GetServerCertResponse {
         val response = ktorClient.client.get {
+            timeout {
+                connectTimeoutMillis = KtorClient.LONG_CONNECTION_TIMEOUT
+            }
             url {
                 appendPathSegments("pair")
-                parameters.append {
-                    add(Params.UpdateState.ToOne)
-                    add(Params.Phrase.GetServerCert)
-                    add(Params.Salt(salt))
-                    add(Params.ClientCert(clientCert))
+                parameters.apply {
+                    append(Params.UpdateState.KEY, Params.UpdateState.ONE)
+                    append(Params.Phrase.KEY, Params.Phrase.GET_SERVER_CERT)
+                    append(Params.Salt.KEY, salt)
+                    append(Params.ClientCert.KEY, clientCert)
                     if (passphraseHexString != null) {
-                        add(Params.OtpAuth(passphraseHexString))
+                        append(Params.OtpAuth.KEY, passphraseHexString)
                     }
+                    append("uuid", Uuid.random().toString())
                 }
             }
         }
@@ -114,8 +116,6 @@ class PairingRepo(
         return xml.decodeFromString<GetServerCertResponse>(response.bodyAsText())
     }
 
-    // TODO Should have read timeout
-    // TODO Force https with earlier Server Cert
     suspend fun sendClientChallenge(
         encryptedChallengeHexString: String
     ): ChallengeResponse {
@@ -124,9 +124,9 @@ class PairingRepo(
         val response = ktorClient.client.get {
             url {
                 appendPathSegments("pair")
-                parameters.append {
-                    add(Params.UpdateState.ToOne)
-                    add(Params.ClientChallenge(encryptedChallengeHexString))
+                parameters.apply {
+                    append(Params.UpdateState.KEY, Params.UpdateState.ONE)
+                    append(Params.ClientChallenge.KEY, encryptedChallengeHexString)
                 }
             }
         }
@@ -134,8 +134,6 @@ class PairingRepo(
         return xml.decodeFromString(response.bodyAsText())
     }
 
-    // TODO Should have read timeout
-    // TODO Force https with earlier Server Cert
     suspend fun sendServerChallengeResponse(
         encryptedChallengeHexString: String
     ): ServerChallengeResponse {
@@ -144,9 +142,9 @@ class PairingRepo(
         val response = ktorClient.client.get {
             url {
                 appendPathSegments("pair")
-                parameters.append {
-                    add(Params.UpdateState.ToOne)
-                    add(Params.ServerChallengeResponse(encryptedChallengeHexString))
+                parameters.apply {
+                    append(Params.UpdateState.KEY, Params.UpdateState.ONE)
+                    append(Params.ServerChallengeResponse.KEY, encryptedChallengeHexString)
                 }
             }
         }
@@ -154,8 +152,6 @@ class PairingRepo(
         return xml.decodeFromString(response.bodyAsText())
     }
 
-    // TODO should have read timeout
-    // TODO Force https with earlier Server Cert
     suspend fun sendClientPairingSecret(
         clientPairingSecretHexString: String
     ): GenericPairingResponse {
@@ -164,17 +160,15 @@ class PairingRepo(
         val response = ktorClient.client.get {
             url {
                 appendPathSegments("pair")
-                parameters.append {
-                    add(Params.UpdateState.ToOne)
-                    add(Params.ClientPairingSecret(clientPairingSecretHexString))
+                parameters.apply {
+                    append(Params.UpdateState.KEY, Params.UpdateState.ONE)
+                    append(Params.ClientPairingSecret.KEY, clientPairingSecretHexString)
                 }
             }
         }
         return xml.decodeFromString(response.bodyAsText())
     }
 
-    // TODO should have read timeout
-    // TODO Force https with earlier Server Cert
     // Attempts this only on https
     suspend fun sendPairingChallenge(): GenericPairingResponse {
         if (ktorClient.isHttps.not()) throw notHTTPSException
@@ -182,9 +176,9 @@ class PairingRepo(
         val response = ktorClient.client.get {
             url {
                 appendPathSegments("pair")
-                parameters.append {
-                    add(Params.UpdateState.ToOne)
-                    add(Params.Phrase.PairChallenge)
+                parameters.apply {
+                    append(Params.UpdateState.KEY, Params.UpdateState.ONE)
+                    append(Params.Phrase.KEY, Params.Phrase.PAIR_CHALLENGE)
                 }
             }
         }

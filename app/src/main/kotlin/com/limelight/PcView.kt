@@ -1,10 +1,10 @@
 package com.limelight
 
-import android.app.Activity
 import android.app.ActivityManager
 import android.app.AlertDialog
 import android.content.ComponentName
 import android.content.Context
+import android.content.Context.MODE_PRIVATE
 import android.content.DialogInterface
 import android.content.Intent
 import android.content.ServiceConnection
@@ -30,6 +30,8 @@ import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.RelativeLayout
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat.startActivity
 import androidx.preference.PreferenceManager
 import com.limelight.binding.PlatformBinding
 import com.limelight.binding.crypto.AndroidCryptoProvider
@@ -42,8 +44,6 @@ import com.limelight.nvstream.http.ComputerDetails
 import com.limelight.nvstream.http.ComputerDetails.AddressTuple
 import com.limelight.nvstream.http.NvApp
 import com.limelight.nvstream.http.NvHTTP
-import com.limelight.nvstream.http.PairingManager
-import com.limelight.nvstream.http.PairingManager.PairState
 import com.limelight.nvstream.wol.WakeOnLanSender
 import com.limelight.preferences.AddComputerManuallyActivity
 import com.limelight.preferences.GlPreferences
@@ -63,8 +63,17 @@ import java.net.UnknownHostException
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 import androidx.core.content.edit
+import androidx.lifecycle.lifecycleScope
+import com.limelight.nvstream.http.KtorClient
+import com.limelight.nvstream.http.PairingManager
+import com.limelight.nvstream.http.PairingManager.PairState
+import com.limelight.nvstream.http.PairingManagerJava
+import com.limelight.nvstream.http.PairingRepo
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-class PcView : Activity(), AdapterFragmentCallbacks {
+class PcView : AppCompatActivity(), AdapterFragmentCallbacks {
     private var noPcFoundLayout: RelativeLayout? = null
     private var pcGridAdapter: PcGridAdapter? = null
     private var shortcutHelper: ShortcutHelper? = null
@@ -82,21 +91,19 @@ class PcView : Activity(), AdapterFragmentCallbacks {
                 (binder as ComputerManagerBinder)
 
             // Wait in a separate thread to avoid stalling the UI
-            object : Thread() {
-                override fun run() {
-                    // Wait for the binder to be ready
-                    localBinder.waitForReady()
+            lifecycleScope.launch(Dispatchers.IO) {
+                // Wait for the binder to be ready
+                localBinder.waitForReady()
 
-                    // Now make the binder visible
-                    managerBinder = localBinder
+                // Now make the binder visible
+                managerBinder = localBinder
 
-                    // Start updates
-                    startComputerUpdates()
+                // Start updates
+                startComputerUpdates()
 
-                    // Force a keypair to be generated early to avoid discovery delays
-                    AndroidCryptoProvider(this@PcView).clientCertificate
-                }
-            }.start()
+                // Force a keypair to be generated early to avoid discovery delays
+                AndroidCryptoProvider(this@PcView).clientCertificate
+            }
         }
 
         override fun onServiceDisconnected(className: ComponentName?) {
@@ -200,11 +207,9 @@ class PcView : Activity(), AdapterFragmentCallbacks {
 
                     LimeLog.info("Fetched GL Renderer: " + glPrefs.glRenderer)
 
-                    runOnUiThread(object : Runnable {
-                        override fun run() {
-                            completeOnCreate()
-                        }
-                    })
+                    lifecycleScope.launch(Dispatchers.Main) {
+                        completeOnCreate()
+                    }
                 }
 
                 override fun onSurfaceChanged(gl10: GL10?, i: Int, i1: Int) {
@@ -260,11 +265,9 @@ class PcView : Activity(), AdapterFragmentCallbacks {
             managerBinder!!.startPolling(object : ComputerManagerListener {
                 override fun notifyComputerUpdated(details: ComputerDetails) {
                     if (!freezeUpdates) {
-                        this@PcView.runOnUiThread(object : Runnable {
-                            override fun run() {
-                                updateComputer(details)
-                            }
-                        })
+                        this@PcView.lifecycleScope.launch(Dispatchers.Main) {
+                            updateComputer(details)
+                        }
 
                         // Add a launcher shortcut for this PC (off the main thread to prevent ANRs)
                         if (details.pairState == PairState.PAIRED) {
@@ -275,12 +278,12 @@ class PcView : Activity(), AdapterFragmentCallbacks {
                             if (details.state == ComputerDetails.State.ONLINE &&
                                 details.activeAddress == pendingPairingAddress
                             ) {
-                                this@PcView.runOnUiThread(Runnable {
+                                this@PcView.lifecycleScope.launch(Dispatchers.Main) {
                                     doPair(details, pendingPairingPin, pendingPairingPassphrase)
                                     pendingPairingAddress = null
                                     pendingPairingPin = null
                                     pendingPairingPassphrase = null
-                                })
+                                }
                             }
                         }
                     }
@@ -479,110 +482,121 @@ class PcView : Activity(), AdapterFragmentCallbacks {
 
         Toast.makeText(this@PcView, resources.getString(R.string.pairing), Toast.LENGTH_SHORT)
             .show()
-        Thread(object : Runnable {
-            override fun run() {
-                val httpConn: NvHTTP?
-                var message: String?
-                var success = false
-                try {
-                    // Stop updates and wait while pairing
-                    stopComputerUpdates(true)
 
-                    httpConn = NvHTTP(
-                        ServerHelper.getCurrentAddressFromComputer(computer),
-                        computer.httpsPort, managerBinder!!.uniqueId, computer.serverCert,
-                        PlatformBinding.getCryptoProvider(this@PcView)
-                    )
-                    if (httpConn.pairState == PairState.PAIRED) {
-                        // Don't display any toast, but open the app list
+        lifecycleScope.launch(Dispatchers.IO) {
+            val httpConn: NvHTTP?
+            var message: String?
+            var success = false
+            try {
+                // Stop updates and wait while pairing
+                stopComputerUpdates(true)
+
+                val address = ServerHelper.getCurrentAddressFromComputer(computer)
+                val cryptoProvider = PlatformBinding.getCryptoProvider(this@PcView)
+                val ktorClient = KtorClient(
+                    address.address,
+                    address.port,
+                    managerBinder!!.uniqueId,
+                    cryptoProvider,
+                    computer.serverCert
+                )
+                val pairingRepo = PairingRepo(ktorClient)
+                val pm = PairingManager(pairingRepo)
+
+//                httpConn = NvHTTP(
+//                    ServerHelper.getCurrentAddressFromComputer(computer),
+//                    computer.httpsPort, managerBinder!!.uniqueId, computer.serverCert,
+//                    cryptoProvider
+//                )
+//                val pairingManagerJava = PairingManagerJava(httpConn, cryptoProvider)
+
+                val serverInfo = ktorClient.getServerInfo()
+                val pairState = if (serverInfo.pairStatus == 1) PairState.PAIRED else PairState.NOT_PAIRED
+                if (pairState == PairState.PAIRED) {
+                    // Don't display any toast, but open the app list
+                    message = null
+                    success = true
+                } else {
+                    var pinStr = otp
+                    if (pinStr == null) {
+                        pinStr = PairingManager.generatePinString()
+                    }
+
+                    // Spin the dialog off in a thread because it blocks
+                    if (passphrase == null) {
+                        Dialog.displayDialog(
+                            this@PcView, resources.getString(R.string.pair_pairing_title),
+                            resources.getString(R.string.pair_pairing_msg) + " " + pinStr + "\n\n" +
+                                    resources.getString(R.string.pair_pairing_help), false
+                        )
+                    } else {
+                        Dialog.displayDialog(
+                            this@PcView,
+                            resources.getString(R.string.pair_pairing_title),
+                            resources.getString(R.string.pair_otp_pairing_msg) + "\n\n" +
+                                    resources.getString(R.string.pair_otp_pairing_help),
+                            false
+                        )
+                    }
+
+                    val pairState = pm.pair(serverInfo, pinStr, passphrase)
+                    if (pairState == PairState.PIN_WRONG) {
+                        message = resources.getString(R.string.pair_incorrect_pin)
+                    } else if (pairState == PairState.FAILED) {
+                        message = if (computer.runningGameId != 0) {
+                            resources.getString(R.string.pair_pc_ingame)
+                        } else {
+                            resources.getString(R.string.pair_fail)
+                        }
+                    } else if (pairState == PairState.ALREADY_IN_PROGRESS) {
+                        message = resources.getString(R.string.pair_already_in_progress)
+                    } else if (pairState == PairState.PAIRED) {
+                        // Just navigate to the app view without displaying a toast
                         message = null
                         success = true
+
+                        // Pin this certificate for later HTTPS use
+                        managerBinder!!.getComputer(computer.uuid).serverCert =
+                            ktorClient.serverCert
+
+                        // Invalidate reachability information after pairing to force
+                        // a refresh before reading pair state again
+                        managerBinder!!.invalidateStateForComputer(computer.uuid)
                     } else {
-                        var pinStr = otp
-                        if (pinStr == null) {
-                            pinStr = PairingManager.generatePinString()
-                        }
-
-                        // Spin the dialog off in a thread because it blocks
-                        if (passphrase == null) {
-                            Dialog.displayDialog(
-                                this@PcView, resources.getString(R.string.pair_pairing_title),
-                                resources.getString(R.string.pair_pairing_msg) + " " + pinStr + "\n\n" +
-                                        resources.getString(R.string.pair_pairing_help), false
-                            )
-                        } else {
-                            Dialog.displayDialog(
-                                this@PcView,
-                                resources.getString(R.string.pair_pairing_title),
-                                resources.getString(R.string.pair_otp_pairing_msg) + "\n\n" +
-                                        resources.getString(R.string.pair_otp_pairing_help),
-                                false
-                            )
-                        }
-
-                        val pm = httpConn.pairingManager
-
-                        val pairState = pm.pair(httpConn.getServerInfo(true), pinStr, passphrase)
-                        if (pairState == PairState.PIN_WRONG) {
-                            message = resources.getString(R.string.pair_incorrect_pin)
-                        } else if (pairState == PairState.FAILED) {
-                            message = if (computer.runningGameId != 0) {
-                                resources.getString(R.string.pair_pc_ingame)
-                            } else {
-                                resources.getString(R.string.pair_fail)
-                            }
-                        } else if (pairState == PairState.ALREADY_IN_PROGRESS) {
-                            message = resources.getString(R.string.pair_already_in_progress)
-                        } else if (pairState == PairState.PAIRED) {
-                            // Just navigate to the app view without displaying a toast
-                            message = null
-                            success = true
-
-                            // Pin this certificate for later HTTPS use
-                            managerBinder!!.getComputer(computer.uuid).serverCert =
-                                pm.pairedCert
-
-                            // Invalidate reachability information after pairing to force
-                            // a refresh before reading pair state again
-                            managerBinder!!.invalidateStateForComputer(computer.uuid)
-                        } else {
-                            // Should be no other values
-                            message = null
-                        }
+                        // Should be no other values
+                        message = null
                     }
-                } catch (_: UnknownHostException) {
-                    message = resources.getString(R.string.error_unknown_host)
-                } catch (_: FileNotFoundException) {
-                    message = resources.getString(R.string.error_404)
-                } catch (e: XmlPullParserException) {
-                    e.printStackTrace()
-                    message = e.message
-                } catch (e: IOException) {
-                    e.printStackTrace()
-                    message = e.message
+                }
+            } catch (_: UnknownHostException) {
+                message = resources.getString(R.string.error_unknown_host)
+            } catch (_: FileNotFoundException) {
+                message = resources.getString(R.string.error_404)
+            } catch (e: XmlPullParserException) {
+                e.printStackTrace()
+                message = e.message
+            } catch (e: IOException) {
+                e.printStackTrace()
+                message = e.message
+            }
+
+            Dialog.closeDialogs()
+
+            val toastMessage = message
+            val toastSuccess = success
+            withContext(Dispatchers.Main) {
+                if (toastMessage != null) {
+                    Toast.makeText(this@PcView, toastMessage, Toast.LENGTH_LONG).show()
                 }
 
-                Dialog.closeDialogs()
-
-                val toastMessage = message
-                val toastSuccess = success
-                runOnUiThread(object : Runnable {
-                    override fun run() {
-                        if (toastMessage != null) {
-                            Toast.makeText(this@PcView, toastMessage, Toast.LENGTH_LONG).show()
-                        }
-
-                        if (toastSuccess) {
-                            // Open the app list after a successful pairing attempt
-                            doAppList(computer, true, false)
-                        } else {
-                            // Start polling again if we're still in the foreground
-                            startComputerUpdates()
-                        }
-                    }
-                })
+                if (toastSuccess) {
+                    // Open the app list after a successful pairing attempt
+                    doAppList(computer, true, false)
+                } else {
+                    // Start polling again if we're still in the foreground
+                    startComputerUpdates()
+                }
             }
-        }).start()
+        }
     }
 
     private fun doOTPPair(computer: ComputerDetails) {
@@ -660,24 +674,21 @@ class PcView : Activity(), AdapterFragmentCallbacks {
             return
         }
 
-        Thread(object : Runnable {
-            override fun run() {
-                var message: String
-                try {
-                    WakeOnLanSender.sendWolPacket(computer)
-                    message = resources.getString(R.string.wol_waking_msg)
-                } catch (_: IOException) {
-                    message = resources.getString(R.string.wol_fail)
-                }
-
-                val toastMessage = message
-                runOnUiThread(object : Runnable {
-                    override fun run() {
-                        Toast.makeText(this@PcView, toastMessage, Toast.LENGTH_LONG).show()
-                    }
-                })
+        lifecycleScope.launch(Dispatchers.IO) {
+            var message: String
+            try {
+                WakeOnLanSender.sendWolPacket(computer)
+                message = resources.getString(R.string.wol_waking_msg)
+            } catch (_: IOException) {
+                message = resources.getString(R.string.wol_fail)
             }
-        }).start()
+
+            val toastMessage = message
+
+            lifecycleScope.launch(Dispatchers.Main) {
+                Toast.makeText(this@PcView, toastMessage, Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private fun doUnpair(computer: ComputerDetails) {
@@ -703,46 +714,42 @@ class PcView : Activity(), AdapterFragmentCallbacks {
             resources.getString(R.string.unpairing),
             Toast.LENGTH_SHORT
         ).show()
-        Thread(object : Runnable {
-            override fun run() {
-                val httpConn: NvHTTP?
-                var message: String?
-                try {
-                    httpConn = NvHTTP(
-                        ServerHelper.getCurrentAddressFromComputer(computer),
-                        computer.httpsPort, managerBinder!!.uniqueId, computer.serverCert,
-                        PlatformBinding.getCryptoProvider(this@PcView)
-                    )
-                    message = if (httpConn.pairState == PairState.PAIRED) {
-                        httpConn.unpair()
-                        if (httpConn.pairState == PairState.NOT_PAIRED) {
-                            resources.getString(R.string.unpair_success)
-                        } else {
-                            resources.getString(R.string.unpair_fail)
-                        }
+        lifecycleScope.launch(Dispatchers.IO) {
+            val httpConn: NvHTTP?
+            var message: String?
+            try {
+                httpConn = NvHTTP(
+                    ServerHelper.getCurrentAddressFromComputer(computer),
+                    computer.httpsPort, managerBinder!!.uniqueId, computer.serverCert,
+                    PlatformBinding.getCryptoProvider(this@PcView)
+                )
+                message = if (httpConn.pairState == PairState.PAIRED) {
+                    httpConn.unpair()
+                    if (httpConn.pairState == PairState.NOT_PAIRED) {
+                        resources.getString(R.string.unpair_success)
                     } else {
-                        resources.getString(R.string.unpair_error)
+                        resources.getString(R.string.unpair_fail)
                     }
-                } catch (_: UnknownHostException) {
-                    message = resources.getString(R.string.error_unknown_host)
-                } catch (_: FileNotFoundException) {
-                    message = resources.getString(R.string.error_404)
-                } catch (e: XmlPullParserException) {
-                    message = e.message
-                    e.printStackTrace()
-                } catch (e: IOException) {
-                    message = e.message
-                    e.printStackTrace()
+                } else {
+                    resources.getString(R.string.unpair_error)
                 }
-
-                val toastMessage = message
-                runOnUiThread(object : Runnable {
-                    override fun run() {
-                        Toast.makeText(this@PcView, toastMessage, Toast.LENGTH_LONG).show()
-                    }
-                })
+            } catch (_: UnknownHostException) {
+                message = resources.getString(R.string.error_unknown_host)
+            } catch (_: FileNotFoundException) {
+                message = resources.getString(R.string.error_404)
+            } catch (e: XmlPullParserException) {
+                message = e.message
+                e.printStackTrace()
+            } catch (e: IOException) {
+                message = e.message
+                e.printStackTrace()
             }
-        }).start()
+
+            val toastMessage = message
+            lifecycleScope.launch(Dispatchers.Main) {
+                Toast.makeText(this@PcView, toastMessage, Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private fun doAppList(

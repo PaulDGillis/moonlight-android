@@ -47,7 +47,6 @@ import org.xmlpull.v1.XmlPullParserFactory;
 import com.limelight.BuildConfig;
 import com.limelight.LimeLog;
 import com.limelight.nvstream.ConnectionContext;
-import com.limelight.nvstream.http.PairingManager.PairState;
 import com.limelight.nvstream.jni.MoonBridge;
 import com.limelight.utils.DeviceUtils;
 
@@ -64,10 +63,11 @@ import okhttp3.ResponseBody;
 public class NvHTTP {
     private String uniqueId;
     private String deviceName;
-    private PairingManager pm;
+//    private PairingManager pm;
 
     public static final int DEFAULT_HTTPS_PORT = 47984;
     public static final int DEFAULT_HTTP_PORT = 47989;
+
     public static final int SHORT_CONNECTION_TIMEOUT = 3000;
     public static final int LONG_CONNECTION_TIMEOUT = 5000;
     public static final int READ_TIMEOUT = 7000;
@@ -235,7 +235,7 @@ public class NvHTTP {
             throw new IOException(e);
         }
 
-        this.pm = new PairingManager(this, cryptoProvider);
+//        this.pm = new PairingManager(this, cryptoProvider);
     }
 
     static String getXmlString(Reader r, String tagname, boolean throwIfMissing) throws XmlPullParserException, IOException {
@@ -571,7 +571,7 @@ public class NvHTTP {
     public PairingManager.PairState getPairState(String serverInfo) throws IOException, XmlPullParserException {
         // appversion is present in all supported GFE versions
         return NvHTTP.getXmlString(serverInfo, "PairStatus", true).equals("1") ?
-                PairState.PAIRED : PairState.NOT_PAIRED;
+                PairingManager.PairState.PAIRED : PairingManager.PairState.NOT_PAIRED;
     }
     
     public long getMaxLumaPixelsH264(String serverInfo) throws XmlPullParserException, IOException {
@@ -705,9 +705,9 @@ public class NvHTTP {
         return null;
     }
 
-    public PairingManager getPairingManager() {
-        return pm;
-    }
+//    public PairingManager getPairingManager() {
+//        return pm;
+//    }
     
     public static LinkedList<NvApp> getAppListByReader(Reader r) throws XmlPullParserException, IOException {
         XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
@@ -787,12 +787,12 @@ public class NvHTTP {
         }
     }
 
-    String executePairingCommand(String additionalArguments, boolean enableReadTimeout) throws HostHttpResponseException, IOException {
+    public String executePairingCommand(String additionalArguments, boolean enableReadTimeout) throws HostHttpResponseException, IOException {
         return openHttpConnectionToString(enableReadTimeout ? httpClientLongConnectTimeout : httpClientLongConnectNoReadTimeout,
                 baseUrlHttp, "pair", "updateState=1&" + additionalArguments);
     }
 
-    String executePairingChallenge() throws HostHttpResponseException, IOException {
+    public String executePairingChallenge() throws HostHttpResponseException, IOException {
         return openHttpConnectionToString(httpClientLongConnectTimeout, getHttpsUrl(true),
                 "pair", "updateState=1&phrase=pairchallenge");
     }

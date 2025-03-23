@@ -29,7 +29,6 @@ import com.limelight.grid.AppGridAdapter
 import com.limelight.nvstream.http.ComputerDetails
 import com.limelight.nvstream.http.NvApp
 import com.limelight.nvstream.http.NvHTTP
-import com.limelight.nvstream.http.PairingManager
 import com.limelight.preferences.PreferenceConfiguration
 import com.limelight.ui.AdapterFragment
 import com.limelight.ui.AdapterFragmentCallbacks
@@ -43,6 +42,7 @@ import org.xmlpull.v1.XmlPullParserException
 import java.io.IOException
 import java.io.StringReader
 import androidx.core.content.edit
+import com.limelight.nvstream.http.PairingManager
 
 class AppView : Activity(), AdapterFragmentCallbacks {
     private var appGridAdapter: AppGridAdapter? = null

@@ -5,7 +5,8 @@ import com.limelight.nvstream.http.model.ServerInfo
 import com.limelight.utils.DeviceUtils
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
-import io.ktor.client.engine.android.Android
+import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.get
@@ -26,7 +27,9 @@ import java.security.PrivateKey
 import java.security.SecureRandom
 import java.security.cert.CertificateException
 import java.security.cert.X509Certificate
+import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLPeerUnverifiedException
 import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509KeyManager
 import javax.net.ssl.X509TrustManager
@@ -35,9 +38,27 @@ class KtorClient(
     private val addrHost: String,
     private val httpPort: Int,
     private val uniqueId: String,
-    cryptoProvider: LimelightCryptoProvider
+    internal val cryptoProvider: LimelightCryptoProvider,
+    serverCert: X509Certificate? = null
 ) {
+    companion object {
+        const val SHORT_CONNECTION_TIMEOUT = 3000L
+        const val LONG_CONNECTION_TIMEOUT = 5000L
+        const val READ_TIMEOUT = 7000L
+    }
+
+    var serverCert: X509Certificate? = serverCert
+        private set
+
     private val deviceName: String = DeviceUtils.getModel()
+    val xml: XML = DefaultXml
+
+    var isHttps: Boolean = serverCert != null
+        private set
+
+    val clientLock = Mutex()
+    var client = buildClient(URLProtocol.HTTP, httpPort)
+        private set
 
     private val keyManager = object : X509KeyManager {
         override fun chooseClientAlias(keyTypes: Array<String?>?, issuers: Array<Principal?>?, socket: Socket?): String
@@ -47,12 +68,12 @@ class KtorClient(
             = null
 
         override fun getCertificateChain(alias: String?): Array<X509Certificate?>
-            = arrayOf<X509Certificate?>(cryptoProvider.getClientCertificate())
+            = arrayOf<X509Certificate?>(cryptoProvider.clientCertificate)
 
         override fun getClientAliases(keyType: String?, issuers: Array<Principal?>?): Array<String?>?
             = null
 
-        override fun getPrivateKey(alias: String?): PrivateKey? = cryptoProvider.getClientPrivateKey()
+        override fun getPrivateKey(alias: String?): PrivateKey? = cryptoProvider.clientPrivateKey
 
         override fun getServerAliases(keyType: String?, issuers: Array<Principal?>?): Array<String?>?
             = null
@@ -101,19 +122,13 @@ class KtorClient(
         }
     }
 
-    val xml: XML = DefaultXml
-
-    var isHttps: Boolean = false
-        private set
-    private var serverCert: X509Certificate? = null
-
-    val clientLock = Mutex()
-    var client = buildClient(URLProtocol.HTTP, httpPort)
-        private set
-
-    fun buildClient(protocol: URLProtocol, port: Int) = HttpClient(Android) {
+    fun buildClient(protocol: URLProtocol, port: Int) = HttpClient(OkHttp) {
         install(ContentNegotiation) {
             xml(format = xml)
+        }
+        install(HttpTimeout) {
+            connectTimeoutMillis = LONG_CONNECTION_TIMEOUT
+            socketTimeoutMillis = READ_TIMEOUT
         }
         defaultRequest {
             host = addrHost
@@ -127,8 +142,22 @@ class KtorClient(
         engine {
             val sslContext = SSLContext.getInstance("TLS")
             sslContext.init(arrayOf(keyManager), arrayOf(serverTrustManager), SecureRandom())
-            sslManager = { httpsURLConnection ->
-                httpsURLConnection.sslSocketFactory = sslContext.socketFactory
+            config {
+                sslSocketFactory(sslContext.socketFactory, serverTrustManager)
+                hostnameVerifier { hostname, session ->
+                    try {
+                        val certificates = session.peerCertificates
+                        if (certificates.size == 1 && certificates[0].equals(serverCert)) {
+                            // Allow any hostname if it's our pinned cert
+                            return@hostnameVerifier true
+                        }
+                    } catch (e: SSLPeerUnverifiedException) {
+                        e.printStackTrace()
+                    }
+
+                    // Fall back to default HostnameVerifier for validating CA-issued certs
+                    HttpsURLConnection.getDefaultHostnameVerifier().verify(hostname, session)
+                }
             }
         }
     }
