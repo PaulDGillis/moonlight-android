@@ -143,32 +143,32 @@ class PcView : AppCompatActivity(), AdapterFragmentCallbacks {
         )
 
         // Setup the list view
-        val settingsButton = findViewById<ImageButton>(R.id.settingsButton)
-        val addComputerButton = findViewById<ImageButton>(R.id.manuallyAddPc)
-        val helpButton = findViewById<ImageButton>(R.id.helpButton)
+//        val settingsButton = findViewById<ImageButton>(R.id.settingsButton)
+//        val addComputerButton = findViewById<ImageButton>(R.id.manuallyAddPc)
+//        val helpButton = findViewById<ImageButton>(R.id.helpButton)
 
-        settingsButton.setOnClickListener(object : View.OnClickListener {
-            override fun onClick(v: View?) {
-                startActivity(Intent(this@PcView, StreamSettings::class.java))
-            }
-        })
-        addComputerButton.setOnClickListener(object : View.OnClickListener {
-            override fun onClick(v: View?) {
-                val i = Intent(this@PcView, AddComputerManuallyActivity::class.java)
-                startActivity(i)
-            }
-        })
-        helpButton.setOnClickListener(object : View.OnClickListener {
-            override fun onClick(v: View?) {
-                HelpLauncher.launchSetupGuide(this@PcView)
-            }
-        })
+//        settingsButton.setOnClickListener(object : View.OnClickListener {
+//            override fun onClick(v: View?) {
+//                startActivity(Intent(this@PcView, StreamSettings::class.java))
+//            }
+//        })
+//        addComputerButton.setOnClickListener(object : View.OnClickListener {
+//            override fun onClick(v: View?) {
+//                val i = Intent(this@PcView, AddComputerManuallyActivity::class.java)
+//                startActivity(i)
+//            }
+//        })
+//        helpButton.setOnClickListener(object : View.OnClickListener {
+//            override fun onClick(v: View?) {
+//                HelpLauncher.launchSetupGuide(this@PcView)
+//            }
+//        })
 
         // Amazon review didn't like the help button because the wiki was not entirely
         // navigable via the Fire TV remote (though the relevant parts were). Let's hide
         // it on Fire TV.
         if (packageManager.hasSystemFeature("amazon.hardware.fire_tv")) {
-            helpButton.visibility = View.GONE
+//            helpButton.visibility = View.GONE
         }
 
         fragmentManager.beginTransaction()

@@ -53,8 +53,8 @@ class KtorClient(
     private val deviceName: String = DeviceUtils.getModel()
     val xml: XML = DefaultXml
 
-    var isHttps: Boolean = serverCert != null
-        private set
+    val isHttps: Boolean
+        get() = serverCert != null
 
     val clientLock = Mutex()
     var client = buildClient(URLProtocol.HTTP, httpPort)
@@ -168,7 +168,6 @@ class KtorClient(
         if (serverCert == null) {
             clientLock.withLock {
                 client.close()
-                isHttps = false
                 client = buildClient(URLProtocol.HTTP, httpPort)
             }
         } else {
@@ -176,7 +175,6 @@ class KtorClient(
             clientLock.withLock {
                 this.serverCert = serverCert
                 client.close()
-                isHttps = true
                 client = buildClient(URLProtocol.HTTPS, httpsPort)
             }
         }
