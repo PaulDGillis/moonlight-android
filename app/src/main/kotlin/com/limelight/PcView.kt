@@ -4,7 +4,6 @@ import android.app.ActivityManager
 import android.app.AlertDialog
 import android.content.ComponentName
 import android.content.Context
-import android.content.Context.MODE_PRIVATE
 import android.content.DialogInterface
 import android.content.Intent
 import android.content.ServiceConnection
@@ -31,7 +30,6 @@ import android.widget.LinearLayout
 import android.widget.RelativeLayout
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat.startActivity
 import androidx.preference.PreferenceManager
 import com.limelight.binding.PlatformBinding
 import com.limelight.binding.crypto.AndroidCryptoProvider
@@ -67,11 +65,11 @@ import androidx.lifecycle.lifecycleScope
 import com.limelight.nvstream.http.KtorClient
 import com.limelight.nvstream.http.PairingManager
 import com.limelight.nvstream.http.PairingManager.PairState
-import com.limelight.nvstream.http.PairingManagerJava
 import com.limelight.nvstream.http.PairingRepo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import javax.net.ssl.SSLHandshakeException
 
 class PcView : AppCompatActivity(), AdapterFragmentCallbacks {
     private var noPcFoundLayout: RelativeLayout? = null
@@ -484,7 +482,6 @@ class PcView : AppCompatActivity(), AdapterFragmentCallbacks {
             .show()
 
         lifecycleScope.launch(Dispatchers.IO) {
-            val httpConn: NvHTTP?
             var message: String?
             var success = false
             try {
@@ -502,13 +499,6 @@ class PcView : AppCompatActivity(), AdapterFragmentCallbacks {
                 )
                 val pairingRepo = PairingRepo(ktorClient)
                 val pm = PairingManager(pairingRepo)
-
-//                httpConn = NvHTTP(
-//                    ServerHelper.getCurrentAddressFromComputer(computer),
-//                    computer.httpsPort, managerBinder!!.uniqueId, computer.serverCert,
-//                    cryptoProvider
-//                )
-//                val pairingManagerJava = PairingManagerJava(httpConn, cryptoProvider)
 
                 val serverInfo = ktorClient.getServerInfo()
                 val pairState = if (serverInfo.pairStatus == 1) PairState.PAIRED else PairState.NOT_PAIRED
@@ -539,7 +529,11 @@ class PcView : AppCompatActivity(), AdapterFragmentCallbacks {
                         )
                     }
 
-                    val pairState = pm.pair(serverInfo, pinStr, passphrase)
+                    val pairState = try {
+                        pm.pair(serverInfo, pinStr, passphrase)
+                    } catch (e: SSLHandshakeException) {
+                        e.printStackTrace()
+                    }
                     if (pairState == PairState.PIN_WRONG) {
                         message = resources.getString(R.string.pair_incorrect_pin)
                     } else if (pairState == PairState.FAILED) {

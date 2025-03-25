@@ -2,6 +2,7 @@ package com.limelight.nvstream.http
 
 import com.limelight.LimeLog
 import com.limelight.nvstream.http.model.ServerInfo
+import kotlinx.coroutines.awaitAll
 import org.bouncycastle.crypto.BlockCipher
 import org.bouncycastle.crypto.engines.AESLightEngine
 import org.bouncycastle.crypto.params.KeyParameter
@@ -20,13 +21,14 @@ import java.security.cert.CertificateException
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.util.Locale
+import kotlin.random.Random
 
 class PairingManager(
     private val pairingRepo: PairingRepo
 ) {
-    private val pk: PrivateKey = pairingRepo.ktorClient.cryptoProvider.clientPrivateKey
-    private val cert: X509Certificate = pairingRepo.ktorClient.cryptoProvider.clientCertificate
-    private val pemCertBytes: ByteArray = pairingRepo.ktorClient.cryptoProvider.pemEncodedClientCertificate
+    private val pk: PrivateKey = pairingRepo.ktorClient.cryptoProvider.clientPrivateKey!!
+    private val cert: X509Certificate = pairingRepo.ktorClient.cryptoProvider.clientCertificate!!
+    private val pemCertBytes: ByteArray = pairingRepo.ktorClient.cryptoProvider.pemEncodedClientCertificate!!
 
     enum class PairState { NOT_PAIRED, PAIRED, PIN_WRONG, FAILED, ALREADY_IN_PROGRESS }
 
@@ -36,12 +38,12 @@ class PairingManager(
         return rand
     }
 
+    @OptIn(ExperimentalStdlibApi::class)
     @Throws(IOException::class, XmlPullParserException::class)
     suspend fun pair(serverInfo: ServerInfo, pin: String, passphrase: String?): PairState {
-        val hashAlgo: PairingHashAlgorithm?
 
         LimeLog.info("Pairing with server generation: ${serverInfo.serverMajorVersion}")
-        hashAlgo = if (serverInfo.serverMajorVersion >= 7) {
+        val hashAlgo = if (serverInfo.serverMajorVersion >= 7) {
             // Gen 7+ uses SHA-256 hashing
             PairingHashAlgorithm.Sha256
         } else {
@@ -56,18 +58,17 @@ class PairingManager(
         // Combine the salt and pin, then create an AES key from them
         val saltedPin = ByteArray(salt.size + pin.length)
         System.arraycopy(salt, 0, saltedPin, 0, salt.size)
-        System.arraycopy(pin.toByteArray(charset("UTF-8")), 0, saltedPin, salt.size, pin.length)
+        System.arraycopy(pin.toByteArray(), 0, saltedPin, salt.size, pin.length)
 
         val aesKey: ByteArray = hashAlgo.hashData(saltedPin).copyOf(16)
 
-        val saltStr: String = salt.toHexString()
-        val clientCert = pemCertBytes.toHexString()
+        val saltStr: String = salt.toHexString(HexFormat.UpperCase)
+        val clientCert = pemCertBytes.toHexString(HexFormat.UpperCase)
 
         val passphraseHexString = if (passphrase != null) {
             try {
-                val digest = MessageDigest.getInstance("SHA-256")
                 val plainText = pin + saltStr + passphrase
-                val hash = digest.digest(plainText.toByteArray())
+                val hash = hashAlgo.hashData(plainText.toByteArray())
 
                 hash.joinToString(separator = "") {
                     String.format("%02X", it)
@@ -79,7 +80,7 @@ class PairingManager(
 
         // Send the salt and get the server cert. This doesn't have a read timeout
         // because the user must enter the PIN before the server responds
-        val response = pairingRepo.getServerCert(saltStr, clientCert, passphraseHexString)
+        val response = pairingRepo.getServerCert(saltStr, clientCert) //passphraseHexString)
 
         if (response.pairedStatus != 1) {
             return PairState.FAILED
@@ -91,7 +92,7 @@ class PairingManager(
             return PairState.ALREADY_IN_PROGRESS
         }
 
-        val certBytes: ByteArray = response.plainCert.hexToByteArray()
+        val certBytes: ByteArray = response.plainCert.hexToByteArray(HexFormat.UpperCase)
 
         val pairedCert = try {
             val cf = CertificateFactory.getInstance("X.509")
@@ -103,7 +104,7 @@ class PairingManager(
 
         // Save this cert for retrieval later
         // Require this cert for TLS to this host
-        pairingRepo.ktorClient.updateClientProtocol(pairedCert)
+//        pairingRepo.ktorClient.updateClientProtocol(pairedCert)
 
         // Generate a random challenge and encrypt it with our AES key
         val randomChallenge = generateRandom16ByteArray()
@@ -111,7 +112,7 @@ class PairingManager(
 
         // Send the encrypted challenge to the server
         val challengeResp =
-            pairingRepo.sendClientChallenge(encryptedChallenge.toHexString())
+            pairingRepo.sendClientChallenge(encryptedChallenge.toHexString(HexFormat.UpperCase))
         if (challengeResp.pairedStatus != 1) {
             pairingRepo.unpair()
             return PairState.FAILED
@@ -119,7 +120,7 @@ class PairingManager(
 
         // Decode the server's response and subsequent challenge
         val encServerChallengeResponse: ByteArray =
-            challengeResp.challengeResponse!!.hexToByteArray()
+            challengeResp.challengeResponse!!.hexToByteArray(HexFormat.UpperCase)
         val decServerChallengeResponse: ByteArray = encServerChallengeResponse.decryptFromAes(aesKey)
 
         val serverResponse = decServerChallengeResponse.copyOfRange(0, hashAlgo.hashLength)
@@ -135,7 +136,7 @@ class PairingManager(
         )
         val challengeRespEncrypted: ByteArray = challengeRespHash.encryptToAes(aesKey)
 
-        val secretResp = pairingRepo.sendServerChallengeResponse(challengeRespEncrypted.toHexString())
+        val secretResp = pairingRepo.sendServerChallengeResponse(challengeRespEncrypted.toHexString(HexFormat.UpperCase))
         if (secretResp.pairedStatus != 1) {
             pairingRepo.unpair()
             return PairState.FAILED
@@ -143,7 +144,7 @@ class PairingManager(
 
         // Get the server's signed secret
         val serverSecretResp: ByteArray =
-            secretResp.pairingSecret!!.hexToByteArray()
+            secretResp.pairingSecret!!.hexToByteArray(HexFormat.UpperCase)
         val serverSecret = serverSecretResp.copyOfRange(0, 16)
         val serverSignature = serverSecretResp.copyOfRange(16, serverSecretResp.size)
 
@@ -178,11 +179,13 @@ class PairingManager(
         val clientPairingSecret: ByteArray =
             clientSecret.concatBytes(clientSecret.signData(pk)!!)
 
-        val clientSecretResp = pairingRepo.sendClientPairingSecret(clientPairingSecret.toHexString())
+        val clientSecretResp = pairingRepo.sendClientPairingSecret(clientPairingSecret.toHexString(HexFormat.UpperCase))
         if (clientSecretResp.pairedStatus != 1) {
             pairingRepo.unpair()
             return PairState.FAILED
         }
+
+        pairingRepo.ktorClient.updateClientProtocol(pairedCert)
 
         // Do the initial challenge (seems necessary for us to show as paired)
         val pairChallenge = pairingRepo.sendPairingChallenge()
@@ -213,30 +216,6 @@ class PairingManager(
     }
 
     companion object {
-        private val hexArray = "0123456789ABCDEF".toCharArray()
-        private fun ByteArray.toHexString(): String {
-            val hexChars = CharArray(this.size * 2)
-            for (j in this.indices) {
-                val v = this[j].toInt() and 0xFF
-                hexChars[j * 2] = hexArray[v ushr 4]
-                hexChars[j * 2 + 1] = hexArray[v and 0x0F]
-            }
-            return String(hexChars)
-        }
-
-        private fun String.hexToByteArray(): ByteArray {
-            val len = this.length
-            require(len % 2 == 0) { "Illegal string length: $len" }
-
-            val data = ByteArray(len / 2)
-            var i = 0
-            while (i < len) {
-                data[i / 2] = ((((this[i].digitToIntOrNull(16) ?: (-1 shl 4)) + (this[i + 1].digitToIntOrNull(16) ?: -1)) )).toByte()
-                i += 2
-            }
-            return data
-        }
-
         @Throws(NoSuchAlgorithmException::class)
         private fun getSha256SignatureInstanceForKey(key: Key): Signature {
             return when (key.algorithm) {

@@ -1,10 +1,10 @@
 package com.limelight.nvstream.http
 
+import io.ktor.client.plugins.HttpTimeoutConfig
 import io.ktor.client.plugins.timeout
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.appendPathSegments
-import io.ktor.http.parameters
 import kotlinx.serialization.decodeFromString
 import io.ktor.serialization.kotlinx.xml.DefaultXml
 import kotlinx.serialization.SerialName
@@ -29,8 +29,12 @@ data class GetServerCertResponse(
     val plainCert: String? = null
 )
 
+//@SerialName("root")
 @Serializable
 data class ChallengeResponse(
+    @SerialName("status_code")
+    val statusCode: Int = 0,
+
     @XmlElement
     @SerialName("paired")
     val pairedStatus: Int,
@@ -40,8 +44,12 @@ data class ChallengeResponse(
     val challengeResponse: String? = null,
 )
 
+@SerialName("root")
 @Serializable
 data class ServerChallengeResponse(
+    @SerialName("status_code")
+    val statusCode: Int = 0,
+
     @XmlElement
     @SerialName("paired")
     val pairedStatus: Int,
@@ -51,8 +59,12 @@ data class ServerChallengeResponse(
     val pairingSecret: String? = null
 )
 
+@SerialName("root")
 @Serializable
 data class GenericPairingResponse(
+    @SerialName("status_code")
+    val statusCode: Int = 0,
+
     @XmlElement
     @SerialName("paired")
     val pairedStatus: Int
@@ -85,8 +97,6 @@ class PairingRepo(
     }
 
     private val xml: XML = DefaultXml
-    // TODO find better solution for this
-    private val notHTTPSException = Exception("HTTPS Required for function")
 
     @OptIn(ExperimentalUuidApi::class)
     suspend fun getServerCert(
@@ -96,11 +106,12 @@ class PairingRepo(
     ): GetServerCertResponse {
         val response = ktorClient.client.get {
             timeout {
-                connectTimeoutMillis = KtorClient.LONG_CONNECTION_TIMEOUT
+                socketTimeoutMillis = HttpTimeoutConfig.INFINITE_TIMEOUT_MS
             }
             url {
                 appendPathSegments("pair")
                 parameters.apply {
+                    append("uuid", Uuid.random().toString())
                     append(Params.UpdateState.KEY, Params.UpdateState.ONE)
                     append(Params.Phrase.KEY, Params.Phrase.GET_SERVER_CERT)
                     append(Params.Salt.KEY, salt)
@@ -108,7 +119,6 @@ class PairingRepo(
                     if (passphraseHexString != null) {
                         append(Params.OtpAuth.KEY, passphraseHexString)
                     }
-                    append("uuid", Uuid.random().toString())
                 }
             }
         }
@@ -119,8 +129,6 @@ class PairingRepo(
     suspend fun sendClientChallenge(
         encryptedChallengeHexString: String
     ): ChallengeResponse {
-        if (ktorClient.isHttps.not()) throw notHTTPSException
-
         val response = ktorClient.client.get {
             url {
                 appendPathSegments("pair")
@@ -137,8 +145,6 @@ class PairingRepo(
     suspend fun sendServerChallengeResponse(
         encryptedChallengeHexString: String
     ): ServerChallengeResponse {
-        if (ktorClient.isHttps.not()) throw notHTTPSException
-
         val response = ktorClient.client.get {
             url {
                 appendPathSegments("pair")
@@ -155,8 +161,6 @@ class PairingRepo(
     suspend fun sendClientPairingSecret(
         clientPairingSecretHexString: String
     ): GenericPairingResponse {
-        if (ktorClient.isHttps.not()) throw notHTTPSException
-
         val response = ktorClient.client.get {
             url {
                 appendPathSegments("pair")
@@ -169,9 +173,9 @@ class PairingRepo(
         return xml.decodeFromString(response.bodyAsText())
     }
 
-    // Attempts this only on https
     suspend fun sendPairingChallenge(): GenericPairingResponse {
-        if (ktorClient.isHttps.not()) throw notHTTPSException
+        // Attempt this only on https
+        require(ktorClient.isHttps.not()) { "sendPairingChallenge must use https" }
 
         val response = ktorClient.client.get {
             url {
@@ -186,7 +190,6 @@ class PairingRepo(
         return xml.decodeFromString(response.bodyAsText())
     }
 
-    // TODO should have read timeout
     suspend fun unpair() {
         ktorClient.client.get {
             url.appendPathSegments("unpair")

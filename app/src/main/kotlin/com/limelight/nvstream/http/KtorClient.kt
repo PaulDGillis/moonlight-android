@@ -39,7 +39,7 @@ class KtorClient(
     private val httpPort: Int,
     private val uniqueId: String,
     internal val cryptoProvider: LimelightCryptoProvider,
-    serverCert: X509Certificate? = null
+    initialServerCert: X509Certificate? = null
 ) {
     companion object {
         const val SHORT_CONNECTION_TIMEOUT = 3000L
@@ -47,7 +47,7 @@ class KtorClient(
         const val READ_TIMEOUT = 7000L
     }
 
-    var serverCert: X509Certificate? = serverCert
+    var serverCert: X509Certificate? = initialServerCert
         private set
 
     private val deviceName: String = DeviceUtils.getModel()
@@ -140,23 +140,25 @@ class KtorClient(
             }
         }
         engine {
-            val sslContext = SSLContext.getInstance("TLS")
-            sslContext.init(arrayOf(keyManager), arrayOf(serverTrustManager), SecureRandom())
             config {
-                sslSocketFactory(sslContext.socketFactory, serverTrustManager)
-                hostnameVerifier { hostname, session ->
-                    try {
-                        val certificates = session.peerCertificates
-                        if (certificates.size == 1 && certificates[0].equals(serverCert)) {
-                            // Allow any hostname if it's our pinned cert
-                            return@hostnameVerifier true
+                if (protocol == URLProtocol.HTTPS) {
+                    val sslContext = SSLContext.getInstance("TLS")
+                    sslContext.init(arrayOf(keyManager), arrayOf(serverTrustManager), SecureRandom())
+                    sslSocketFactory(sslContext.socketFactory, serverTrustManager)
+                    hostnameVerifier { hostname, session ->
+                        try {
+                            val certificates = session.peerCertificates
+                            if (certificates.size == 1 && certificates[0].equals(serverCert)) {
+                                // Allow any hostname if it's our pinned cert
+                                return@hostnameVerifier true
+                            }
+                        } catch (e: SSLPeerUnverifiedException) {
+                            e.printStackTrace()
                         }
-                    } catch (e: SSLPeerUnverifiedException) {
-                        e.printStackTrace()
-                    }
 
-                    // Fall back to default HostnameVerifier for validating CA-issued certs
-                    HttpsURLConnection.getDefaultHostnameVerifier().verify(hostname, session)
+                        // Fall back to default HostnameVerifier for validating CA-issued certs
+                        HttpsURLConnection.getDefaultHostnameVerifier().verify(hostname, session)
+                    }
                 }
             }
         }
@@ -172,6 +174,7 @@ class KtorClient(
         } else {
             val httpsPort = getServerInfo().httpsPort
             clientLock.withLock {
+                this.serverCert = serverCert
                 client.close()
                 isHttps = true
                 client = buildClient(URLProtocol.HTTPS, httpsPort)
