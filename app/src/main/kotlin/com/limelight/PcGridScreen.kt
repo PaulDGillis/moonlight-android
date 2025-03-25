@@ -5,10 +5,16 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -93,6 +99,33 @@ private fun NoPcFoundLoading(
 }
 
 @Composable
+private fun PcIcon(
+    isLoading: Boolean,
+
+) {
+    Column(
+        Modifier.padding(20.dp).width(125.dp).wrapContentHeight(),
+        verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(Modifier.size(125.dp)) {
+            if (isLoading) {
+                CircularProgressIndicator(Modifier.align(Alignment.Center))
+            } else {
+                Icon(painterResource(R.drawable.ic_computer), null)
+            }
+        }
+
+        Text(
+            "DESKTOP-PAUL",
+            Modifier.wrapContentSize(),
+            style = MaterialTheme.typography.headlineSmall,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
 private fun IconButton(
     @DrawableRes painterRes: Int,
     @StringRes contentDescriptionRes: Int,
@@ -100,6 +133,14 @@ private fun IconButton(
 ) {
     IconButton(onClick, Modifier.size(70.dp, 65.dp)) {
         Icon(painterResource(painterRes), stringResource(contentDescriptionRes))
+    }
+}
+
+@Preview
+@Composable
+private fun PcIconPreview() {
+    MaterialTheme {
+        PcIcon(isLoading = false)
     }
 }
 
